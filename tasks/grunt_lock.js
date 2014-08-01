@@ -14,24 +14,9 @@
 module.exports = function (grunt) {
 
   var lockFile = require('lockfile'),
-    readline = require('readline'),
     fs = require('fs'),
-    handleWait = function () {
-      var rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-      });
-
-      rl.question("Lockfile already established, try again? [y/N] ", function (answer) {
-        answer = answer || 'N';
-
-        rl.close();
-
-        if (answer.toLowerCase() == 'y') {
-          setTimeout(handleLockfile, 0);
-        }
-      });
-    },
+    minimatch = require('minimatch'),
+    quiet = false,
     getLockInfo = function (lockInfo) {
       return "Grunt is locked by user ".yellow + lockInfo.user.red.bold + " with command ".yellow + "grunt ".red.bold + lockInfo.tasks.join(" ").red.bold + " started at ".yellow + lockInfo.created.red.bold;
     },
@@ -53,15 +38,17 @@ module.exports = function (grunt) {
       var createLockFile = true;
 
       try {
-        grunt.verbose.ok('try writing lockinfo to file');
+        !quiet && grunt.verbose.ok('try writing lockinfo to file');
         var lockInfo = grunt.file.readJSON(data.path);
+
         if (lockInfo) {
+          grunt.verbose.ok('Lockfile exists. Checking for childprocess');
           var parentPid = lockInfo.pid,
             givenParentPid = grunt.option('parentPid');
 
           //create lock can be skipped, if this process is a child-process of the locking one
           if (lockInfo.user == process.env['USER'] && parentPid == givenParentPid) {
-            grunt.log.ok('lockfile exists, but is from a parentProcess');
+            !quiet && grunt.log.ok('lockfile exists, but is from a parentProcess');
             createLockFile = false;
           } else {
             grunt.fail.fatal(getLockInfo(lockInfo));
@@ -73,11 +60,11 @@ module.exports = function (grunt) {
 
       if (createLockFile) {
         //if the task would be locked, check if the current task is allowed
-        if (!checkForAllowedTask(data)) {
+        if (!checkForAllowedTask(data.allowed, grunt.cli.tasks)) {
           grunt.fail.fatal('Task not allowed');
         }
 
-        grunt.verbose.ok('Creating Lockfile');
+        !quiet && grunt.verbose.ok('Creating Lockfile');
         //Create lock at every run!
         createLock(data, options, done);
 
@@ -86,6 +73,7 @@ module.exports = function (grunt) {
           grunt.option('parentPid', grunt.config.get('pid'));
         }
       }
+
       done();
     },
     createLock = function (data, options) {
@@ -93,20 +81,11 @@ module.exports = function (grunt) {
         // lets try to establish a synced lock
         lockFile.lockSync(data.path, options);
         writeLockInfo(data);
-
-        grunt.log.ok(JSON.stringify(grunt.file.readJSON(data.path)));
       } catch (ex) {
         // check the error code
         if (ex.code == 'EEXIST') {
           // the file is already present
-
-          if (!data.interactive) {
-            grunt.fail.warn(getLockInfo() + data.path);
-            return;
-          }
-
-          // user wants interactive mode, ask for waiting
-          handleWait();
+          grunt.fail.warn(getLockInfo() + data.path);
           return;
         } else {
           // an unhandled exception occured, something like an invalid option for the current mode
@@ -117,49 +96,113 @@ module.exports = function (grunt) {
 
       grunt.log.ok('Lockfile established');
     },
-    checkForIgnoredTask = function (data) {
-      if (!data.ignore) {
-        return false;
+    /**
+     * TODO: Unittest
+     * @param {String} string
+     * @param {String} pattern
+     * @returns {*|exports}
+     */
+    matches = function (string, pattern) {
+      var result = minimatch(string, pattern);
+      !quiet && grunt.verbose.writeln(string.bold + " + " + pattern.bold + " = " + result);
+      return result;
+    },
+    /**
+     * @param {String|Array}taskList
+     * @returns {Array}
+     */
+    normalizeTaskList = function (taskList) {
+      //if ignore is just a string, wrap it in a array
+      if (!Array.isArray(taskList) && (typeof taskList == 'string' || taskList instanceof String)) {
+        taskList = [taskList];
       }
 
-      grunt.verbose.ok('Check for allowed tasks by array');
+      return taskList;
+    },
+    /**
+     * @param {Array} patternList
+     * @param {Array} tasks
+     * @returns {true|String}
+     */
+    checkForTask = function (patternList, tasks) {
 
-      for (var taskIndex in grunt.cli.tasks) {
-        var taskName = grunt.cli.tasks[taskIndex];
-        if (Array.isArray(data.ignore)) {
-          if (data.ignore.indexOf(taskName) > 0) {
-            return true;
-          }
-        } else {
-          if (taskName == data.ignore) {
-            return true;
+      for (var taskIndex in tasks) {
+        var task = tasks[taskIndex];
+        var taskMatches = false;
+
+        for (var index in patternList) {
+          var taskPattern = patternList[index];
+          if (matches(task, taskPattern)) {
+            taskMatches = true;
+            break;
           }
         }
-      }
 
-      return false;
-    },
-    checkForAllowedTask = function (data) {
-      if (!data.allowed) {
-        return true;
-      }
+        if (!taskMatches) {
+          if (!quiet) {
+            grunt.verbose.ok('Task does not match patternlist');
+            grunt.verbose.ok('Task:    ' + task);
+            grunt.verbose.ok('pattern: ' + patternList.join(', '));
+          }
 
-      for (var taskIndex in grunt.cli.tasks) {
-        var taskName = grunt.cli.tasks[taskIndex];
-        if (Array.isArray(data.allowed)) {
-          if (data.allowed.indexOf(taskName) < 0) {
-            grunt.fail.fatal('The task ' + taskName + ' is not allowed by lockfile config');
-            return false;
-          }
-        } else {
-          if (taskName == data.allowed) {
-            grunt.fail.fatal('The task ' + taskName + ' is not allowed by lockfile config');
-            return false;
-          }
+          return task;
         }
       }
 
       return true;
+    },
+    /**
+     * Check if the ignore array covers all (manual) executed tasks
+     * TODO: add a unit test for this
+     * @param {String|Array} ignore
+     * @param {Array} tasks
+     * @returns {boolean}
+     */
+    checkForIgnoredTask = function (ignore, tasks) {
+      ignore = normalizeTaskList(ignore);
+
+      if (!ignore) {
+        return false;
+      }
+
+      if (!quiet) {
+        grunt.verbose.ok('Checking for ignored tasks');
+        grunt.verbose.ok('ignored: ' + ignore.join(', '));
+        grunt.verbose.ok('tasks:   ' + tasks.join(', '));
+      }
+
+      var result = checkForTask(ignore, tasks);
+      return result === true;
+    },
+    /**
+     * Check if allowed array covers all (manual) executed tasks
+     * TODO: unittest
+     *
+     * @param allowed
+     * @param tasks
+     * @returns {boolean}
+     */
+    checkForAllowedTask = function (allowed, tasks) {
+      allowed = normalizeTaskList(allowed);
+
+      if (!allowed) {
+        return true;
+      }
+
+      if (!quiet) {
+        grunt.verbose.ok('Checking for allowed tasks: ');
+        grunt.verbose.ok('allowed: ' + allowed.join(', '));
+        grunt.verbose.ok('tasks:   ' + tasks.join(', '));
+      }
+
+      var result = checkForTask(allowed, tasks);
+
+      if (result === true) {
+        return true;
+      } else {
+        !quiet && grunt.log.writeln(result.bold.red + " is not allowed by config: " + allowed.join(', '));
+      }
+      return result === true;
     };
 
   grunt.registerMultiTask('lockfile', 'Wraps nodejs lockfile with some additional features, currently only lockSync.', function () {
@@ -171,10 +214,14 @@ module.exports = function (grunt) {
       grunt.fail.warn('Missing filename for lockfile');
     }
 
-    grunt.verbose.writeln('Lockfile: ' + data.path);
+    if (data.quiet) {
+      quiet = true;
+    }
 
-    if (checkForIgnoredTask(data)) {
-      grunt.log.ok('Detected ignored task for logfile. Lockchecks disabled. Lockfile will not be created.');
+    !quiet && grunt.verbose.writeln('Lockfile: ' + data.path);
+
+    if (checkForIgnoredTask(data.ignored, grunt.cli.tasks)) {
+      !quiet && grunt.log.ok('Detected ignored task for logfile. Lockchecks disabled. Lockfile will not be created.');
       done();
     } else {
       handleLockfile(data, options, done);
