@@ -18,6 +18,13 @@ module.exports = function (grunt) {
     minimatch = require('minimatch'),
     quiet = false;
   var lib = {
+    getCurrentUser: function() {
+      if (process.env['SUDO_USER']) {
+          return process.env['SUDO_USER'] + ' (sudo)'
+      }
+      
+      return process.env['USER'];
+    },
     getLockInfo: function (lockInfo) {
       return "Grunt is locked by user ".yellow + lockInfo.user.red.bold + " with command ".yellow + "grunt ".red.bold + lockInfo.tasks.join(" ").red.bold + " started at ".yellow + lockInfo.created.red.bold;
     },
@@ -25,7 +32,7 @@ module.exports = function (grunt) {
       try {
         var fd = fs.openSync(data.path, 'w');
         fs.writeSync(fd, JSON.stringify({
-          user: process.env['USER'],
+          user: this.getCurrentUser(),
           pid: process.pid,
           tasks: grunt.cli.tasks,
           created: grunt.template.today('yyyy-mm-dd HH:MM:ss')
@@ -54,7 +61,7 @@ module.exports = function (grunt) {
             givenParentPid = grunt.option('parentPid');
 
           //create lock can be skipped, if this process is a child-process of the locking one
-          if (lockInfo.user == process.env['USER'] && parentPid == givenParentPid) {
+          if (lockInfo.user == this.getCurrentUser && parentPid == givenParentPid) {
             !quiet && grunt.log.ok('lockfile exists, but is from a parentProcess');
             createLockFile = false;
           } else {
