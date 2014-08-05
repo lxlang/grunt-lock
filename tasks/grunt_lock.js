@@ -61,7 +61,7 @@ module.exports = function (grunt) {
             givenParentPid = grunt.option('parentPid');
 
           //create lock can be skipped, if this process is a child-process of the locking one
-          if (lockInfo.user == this.getCurrentUser && parentPid == givenParentPid) {
+          if (lockInfo.user == this.getCurrentUser() && parentPid == givenParentPid) {
             !quiet && grunt.log.ok('lockfile exists, but is from a parentProcess');
             createLockFile = false;
           } else {
