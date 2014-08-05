@@ -27,12 +27,18 @@ module.exports = function (grunt) {
         fs.writeSync(fd, JSON.stringify({
           user: process.env['USER'],
           pid: process.pid,
-          tasks: grunt.cli.tasks, //TODO: check
+          tasks: grunt.cli.tasks,
           created: grunt.template.today('yyyy-mm-dd HH:MM:ss')
         }));
       } catch (ex) {
-        //TODO: delete lockfile before fail
-        grunt.fail.warn('Could not write info to lockfile');
+        //could not write infos to lockfile. I dont know what can cause this
+        try {
+          lockFile.unlockSync(data.path);
+          grunt.fail.warn('Could not write info to lockfile');
+        } catch (ex2) {
+          grunt.fail.warn('Could not write info to lockfile. Caution: Lockfile still exists!');
+        }
+
       }
     },
     handleLockfile: function (data, options, done) {
@@ -115,17 +121,17 @@ module.exports = function (grunt) {
     normalizeTaskList: function (taskList) {
       //if ignore is just a string, wrap it in a array
       if (!Array.isArray(taskList)) {
-          if (taskList && typeof taskList == 'string' || taskList instanceof String) {
-            taskList = [taskList];
-          } else {
-            taskList = [];
-          }
+        if (taskList && typeof taskList == 'string' || taskList instanceof String) {
+          taskList = [taskList];
+        } else {
+          taskList = [];
+        }
       }
-      
+
       if (taskList.length == 0) {
         return false;
       }
-      
+
       return taskList;
     },
     /**
@@ -134,18 +140,15 @@ module.exports = function (grunt) {
      * @returns {boolean|String}
      */
     checkForTask: function (patternList, tasks) {
+      var notMatchingTasks = [];
 
-      for (var taskIndex in tasks) {
-        var task = tasks[taskIndex];
+      tasks.forEach(function (task) {
         var taskMatches = false;
-
-        for (var index in patternList) {
-          var taskPattern = patternList[index];
+        patternList.forEach(function (taskPattern) {
           if (this.matches(task, taskPattern)) {
             taskMatches = true;
-            break;
           }
-        }
+        }, this);
 
         if (!taskMatches) {
           if (!quiet) {
@@ -153,16 +156,21 @@ module.exports = function (grunt) {
             grunt.verbose.ok('Task:    ' + task);
             grunt.verbose.ok('pattern: ' + patternList.join(', '));
           }
-
+          notMatchingTasks.push(task);
           return task;
         }
+      }, this);
+
+      if (notMatchingTasks.length > 0) {
+        return notMatchingTasks.join(', ');
       }
 
       return true;
     },
+
     /**
      * Check if the ignore array covers all (manual) executed tasks
-     * 
+     *
      * @param {String|Array} ignore
      * @param {Array} tasks
      * @returns {boolean}
@@ -185,7 +193,6 @@ module.exports = function (grunt) {
     },
     /**
      * Check if allowed array covers all (manual) executed tasks
-     * TODO: unittest
      *
      * @param allowed
      * @param tasks
@@ -237,6 +244,6 @@ module.exports = function (grunt) {
       lib.handleLockfile(data, options, done);
     }
   });
-  
+
   return lib;
 };
