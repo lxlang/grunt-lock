@@ -27,10 +27,10 @@
     "test": "mocha --recursive --ui tdd --reporter spec --bail"
   },
   "devDependencies": {
-    "grunt": "~0.4.2",
-    "grunt-contrib-clean": "~0.4.0",
-    "grunt-contrib-jshint": "~0.6.0",
-    "grunt-contrib-nodeunit": "~0.2.0",
+    "grunt": "~0.4.5",
+    "grunt-contrib-clean": "~0.6.0",
+    "grunt-contrib-jshint": "~0.10.0",
+    "grunt-contrib-nodeunit": "~0.4.1",
     "lockfile": "~0.4.2",
     "minimatch": "^1.0.0",
     "mocha": "^1.21.3"

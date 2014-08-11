@@ -2,6 +2,10 @@
 
 > A Grunt-Plugin to handle lockfiles within Grunt, currently just wraps lockSync of https://www.npmjs.org/package/lockfile
 
+[![Build Status](https://secure.travis-ci.org/lxlang/grunt-lock-extended.svg?branch=master)](https://travis-ci.org/lxlang/grunt-lock-extended)
+[![Dependencies Status](https://david-dm.org/lxlang/grunt-lock-extended.svg)](https://david-dm.org/lxlang/grunt-lock-extended)
+[![Dev Dependencies Status](https://david-dm.org/lxlang/grunt-lock-extended/dev-status.svg)](https://david-dm.org/lxlang/grunt-lock-extended#info=devDependencies)
+
 ## Getting Started
 This plugin requires Grunt `~0.4.2`
 
