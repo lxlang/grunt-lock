@@ -18,15 +18,15 @@ module.exports = function (grunt) {
     minimatch = require('minimatch'),
     quiet = false;
   var lib = {
-    getCurrentUser: function() {
+    getCurrentUser: function () {
       if (process.env['SUDO_USER']) {
-          return process.env['SUDO_USER'] + ' (sudo)'
+        return process.env['SUDO_USER'] + ' (sudo)';
       }
-      
+
       return process.env['USER'];
     },
     getLockInfo: function (lockInfo) {
-      return "Grunt is locked by user ".yellow + lockInfo.user.red.bold + " with command ".yellow + "grunt ".red.bold + lockInfo.tasks.join(" ").red.bold + " started at ".yellow + lockInfo.created.red.bold;
+      return 'Grunt is locked by user '.yellow + lockInfo.user.red.bold + ' with command '.yellow + 'grunt '.red.bold + lockInfo.tasks.join(' ').red.bold + ' started at '.yellow + lockInfo.created.red.bold;
     },
     writeLockInfo: function (data) {
       try {
@@ -52,7 +52,10 @@ module.exports = function (grunt) {
       var createLockFile = true;
 
       try {
-        !quiet && grunt.verbose.ok('try writing lockinfo to file');
+        if (!quiet) {
+          grunt.verbose.ok('try writing lockinfo to file');
+        }
+
         var lockInfo = grunt.file.readJSON(data.path);
 
         if (lockInfo) {
@@ -61,8 +64,11 @@ module.exports = function (grunt) {
             givenParentPid = grunt.option('parentPid');
 
           //create lock can be skipped, if this process is a child-process of the locking one
-          if (lockInfo.user == this.getCurrentUser() && parentPid == givenParentPid) {
-            !quiet && grunt.log.ok('lockfile exists, but is from a parentProcess');
+          if (lockInfo.user === this.getCurrentUser() && parentPid === givenParentPid) {
+            if (!quiet) {
+              grunt.log.ok('lockfile exists, but is from a parentProcess');
+            }
+
             createLockFile = false;
           } else {
             grunt.fail.fatal(this.getLockInfo(lockInfo));
@@ -78,7 +84,10 @@ module.exports = function (grunt) {
           grunt.fail.fatal('Task not allowed');
         }
 
-        !quiet && grunt.verbose.ok('Creating Lockfile');
+        if (!quiet) {
+          grunt.verbose.ok('Creating Lockfile');
+        }
+
         //Create lock at every run!
         this.createLock(data, options, done);
 
@@ -97,7 +106,7 @@ module.exports = function (grunt) {
         this.writeLockInfo(data);
       } catch (ex) {
         // check the error code
-        if (ex.code == 'EEXIST') {
+        if (ex.code === 'EEXIST') {
           // the file is already present
           var lockInfo = grunt.file.readJSON(data.path);
           grunt.fail.warn(this.getLockInfo(lockInfo) + data.path);
@@ -118,7 +127,11 @@ module.exports = function (grunt) {
      */
     matches: function (string, pattern) {
       var result = minimatch(string, pattern);
-      !quiet && grunt.verbose.writeln(string.bold + " + " + pattern.bold + " = " + result);
+
+      if (!quiet) {
+        grunt.verbose.writeln(string.bold + ' + ' + pattern.bold + ' = ' + result);
+      }
+
       return result;
     },
     /**
@@ -128,14 +141,14 @@ module.exports = function (grunt) {
     normalizeTaskList: function (taskList) {
       //if ignore is just a string, wrap it in a array
       if (!Array.isArray(taskList)) {
-        if (taskList && typeof taskList == 'string' || taskList instanceof String) {
+        if (taskList && typeof taskList === 'string' || taskList instanceof String) {
           taskList = [taskList];
         } else {
           taskList = [];
         }
       }
 
-      if (taskList.length == 0) {
+      if (taskList.length === 0) {
         return false;
       }
 
@@ -223,7 +236,7 @@ module.exports = function (grunt) {
       if (result === true) {
         return true;
       } else {
-        grunt.log.writeln(result.bold.red + " is not allowed by config: " + allowed.join(', '));
+        grunt.log.writeln(result.bold.red + ' is not allowed by config: ' + allowed.join(', '));
       }
       return result === true;
     }
@@ -242,10 +255,15 @@ module.exports = function (grunt) {
       quiet = true;
     }
 
-    !quiet && grunt.verbose.writeln('Lockfile: ' + data.path);
+    if (!quiet) {
+      grunt.verbose.writeln('Lockfile: ' + data.path);
+    }
 
     if (lib.checkForIgnoredTask(data.ignored, grunt.cli.tasks)) {
-      !quiet && grunt.log.ok('Detected ignored task for logfile. Lockchecks disabled. Lockfile will not be created.');
+      if (!quiet) {
+        grunt.log.ok('Detected ignored task for logfile. Lockchecks disabled. Lockfile will not be created.');
+      }
+
       done();
     } else {
       lib.handleLockfile(data, options, done);
