@@ -162,6 +162,10 @@ module.exports = function (grunt) {
     checkForTask: function (patternList, tasks) {
       var notMatchingTasks = [];
 
+      if (tasks.length == 0) {
+        tasks = ['']
+      }
+
       tasks.forEach(function (task) {
         var taskMatches = false;
         patternList.forEach(function (taskPattern) {

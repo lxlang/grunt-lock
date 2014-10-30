@@ -16,7 +16,8 @@ describe('matching tasks', function() {
   it('check for matching tasks', function() {
     var patterns = ['foo*','*bar','baz'];
     
-    assert.notEqual(lockFileExtendedLib.checkForTask(patterns, ['lalalala']), true);
+	assert.notEqual(lockFileExtendedLib.checkForTask(patterns, ['lalalala']), true);
+	assert.notEqual(lockFileExtendedLib.checkForTask(patterns, []), true);
     assert.equal(lockFileExtendedLib.checkForTask(patterns, ['foo', 'bar', 'baz']), true);
     assert.equal(lockFileExtendedLib.checkForTask(patterns, ['foooooooo', 'babababar', 'baz']), true);
     assert.notEqual(lockFileExtendedLib.checkForTask(patterns, ['foooooooo', 'barrrrr', 'baz']), true);
